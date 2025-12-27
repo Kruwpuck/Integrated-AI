@@ -1,0 +1,24 @@
+# Virtual Environment
+vhumic/
+venv/
+env/
+__pycache__/
+*.pyc
+
+# Datasets & Outputs
+Dataset/
+output/
+output_api/
+gambar/
+gambar_api/
+
+# Large Model Files
+model DL/
+*.pth
+*.keras
+*.h5
+*.joblib
+*.onnx
+
+# Jupyter Notebook checkpoints
+.ipynb_checkpoints/
