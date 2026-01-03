@@ -156,37 +156,32 @@ def preprocess_densenet121_pytorch(img_path, device):
     and transforms to Tensor for PyTorch.
     Returns: Tensor and Original Grayscale (for Radiomics)
     """
-    img = cv2.imread(img_path)
-    if img is None:
-        raise ValueError(f"Could not load image at {img_path}")
+    # Load gambar original
+    img_pil = Image.open(img_path).convert('RGB')
     
-    # 1. Median Filter
-    img = cv2.medianBlur(img, 3)
+    # 1. Alur UltrasoundEnhancement (Sesuai Notebook)
+    img_np = np.array(img_pil.convert('L')) # Ke Grayscale
     
-    # 2. CLAHE (on LAB L-channel)
-    lab = cv2.cvtColor(img, cv2.COLOR_BGR2LAB)
-    l, a, b = cv2.split(lab)
-    clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
-    cl = clahe.apply(l)
-    limg = cv2.merge((cl, a, b))
-    img_processed = cv2.cvtColor(limg, cv2.COLOR_LAB2RGB) # RGB for PyTorch
+    # 2. Denoising (Kernel 5 sesuai notebook)
+    img_np = cv2.medianBlur(img_np, 5) #
+    
+    # 3. CLAHE (ClipLimit 2.0, Grid 8x8)
+    clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8)) #
+    img_np = clahe.apply(img_np)
+    
+    # 4. Kembalikan ke RGB agar bisa diterima DenseNet
+    img_processed_np = cv2.cvtColor(img_np, cv2.COLOR_GRAY2RGB) #
+    img_processed_pil = Image.fromarray(img_processed_np)
 
-    # Grayscale for Radiomics/GradCAM overlay logic later
-    img_gray = cv2.cvtColor(img_processed, cv2.COLOR_RGB2GRAY)
-
-    # Transform for PyTorch
+    # 5. Transformasi Standar PyTorch
     transform = transforms.Compose([
-        transforms.ToPILImage(),
         transforms.Resize((224, 224)),
         transforms.ToTensor(),
-        transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
+        transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]), #
     ])
     
-    tensor = transform(img_processed).unsqueeze(0).to(device)
-    
-    # Return processed image in RGB (cv2 format) to help visualization if needed
-    # and the tensor
-    return tensor, img_processed
+    tensor = transform(img_processed_pil).unsqueeze(0).to(device)
+    return tensor, img_processed_np
 
 # ==========================================
 # 4. Model Loaders
@@ -204,10 +199,10 @@ def load_pytorch_densenet121(path, device):
         model.classifier = nn.Linear(model.classifier.in_features, 3)
         
         if isinstance(checkpoint, dict) and 'model_state_dict' in checkpoint:
-             model.load_state_dict(checkpoint['model_state_dict'], strict=False)
+            model.load_state_dict(checkpoint['model_state_dict'], strict=False)
         else:
-             model.load_state_dict(checkpoint, strict=False)
-             
+            model.load_state_dict(checkpoint, strict=False)
+
         model.to(device)
         model.eval()
         return model
@@ -221,24 +216,11 @@ def load_keras_model_feature_extractor(path, layer_name=None):
     from Global Average Pooling or the layer before the final Dense.
     """
     model = load_model(path, compile=False)
-    
-    # Auto-detect feature layer if not specified
-    if layer_name is None:
-        # Look for global pooling or last dense before prediction
-        for layer in reversed(model.layers):
-            if 'global_average_pooling' in layer.name.lower():
-                layer_name = layer.name
-                break
-            if 'dense' in layer.name.lower() and layer != model.layers[-1]:
-                 # Usually the second to last layer is features if it's a dense layer
-                 layer_name = layer.name
-                 break
-        
-        # Fallback
-        if layer_name is None:
-             layer_name = model.layers[-2].name
-             
-    feature_model = Model(inputs=model.input, outputs=model.get_layer(layer_name).output)
-    print(f"Loaded Keras model from {os.path.basename(path)}. Extracting from layer: {layer_name}")
-    return feature_model
-
+    layer_name = None
+    # Mencari layer Dense terakhir sebelum output (untuk mendapatkan 256/128 fitur)
+    for layer in reversed(model.layers):
+        if 'dense' in layer.name.lower() and layer != model.layers[-1]:
+            layer_name = layer.name
+            break
+    if not layer_name: layer_name = model.layers[-2].name
+    return Model(inputs=model.input, outputs=model.get_layer(layer_name).output)
