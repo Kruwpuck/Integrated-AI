@@ -1,0 +1,10 @@
+Results Summary
+Dataset: 1030 images
+Classes: benign, malignant, normal
+Train: 824 Test: 206
+Radiomics features: 300
+Total fused features: 1708
+Classifier: LightGBM
+Best method: ANOVA_200
+F1-Macro: 0.9844
+Accuracy: 0.9806

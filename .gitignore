@@ -13,12 +13,19 @@ gambar/
 gambar_api/
 
 # Large Model Files
+# Large Model Files
+# Large Model Files
+modelDL/
 model DL/
 *.pth
 *.keras
 *.h5
 *.joblib
 *.onnx
+model2/
+model2*
+DATASET_GRADCAM_OUTPUT/
+fusion_results/
 
 # Jupyter Notebook checkpoints
 .ipynb_checkpoints/
